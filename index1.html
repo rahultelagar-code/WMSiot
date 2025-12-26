@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Water Management App</title>
+    <style>
+      /* --- GLOBAL APP STYLES (DARK/NEON THEME) --- */
+      body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(to right top, #0f2027, #203a43, #2c5364);
+            color: #eee; margin: 0; padding: 0; min-height: 100vh;
+      }
+      .container { width: 95%; max-width: 1200px; margin: auto; padding: 20px 10px; }
+      h1 { text-align: center; margin-bottom: 20px; color: #00ffff; text-shadow: 0 0 10px rgba(0, 255, 255, 0.7); }
+      
+      /* Glassmorphic card style */
+      .card {
+            background: rgba(0, 20, 30, 0.6); border-radius: 16px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.1), 0 4px 10px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.2); padding: 20px; margin-bottom: 20px; overflow: hidden;
+      }
+      h2 { margin-top: 0; border-bottom: 2px solid rgba(0, 255, 255, 0.3); padding-bottom: 10px; color: #fff; }
+
+      /* --- LOGIN/FORM STYLES --- */
+      .auth-container, .help-desk-container { max-width: 400px; margin: 100px auto; text-align: center; }
+      .auth-container h2, .help-desk-container h2 { text-align: center; border-bottom: none; }
+      .auth-form input, .help-desk-form input, .help-desk-form textarea {
+            width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px;
+            border: 1px solid rgba(0, 255, 255, 0.3); font-size: 16px; background: rgba(0, 0, 0, 0.3);
+            color: #fff; box-sizing: border-box;
+      }
+      .btn {
+            padding: 12px 20px; font-size: 16px; border: none; border-radius: 8px;
+            cursor: pointer; transition: all 0.3s ease; font-weight: bold; color: #000; margin-top: 10px;
+      }
+      .btn-primary { background: #00ffff; box-shadow: 0 0 10px rgba(0, 255, 255, 0.7); width: 100%; }
+      .btn-primary:hover { background: #00c0c0; }
+      
+      /* Small action button for Reset */
+      .btn-sm { padding: 5px 10px; font-size: 12px; margin-top: 5px; background: #ff003c; color: #fff; border: 1px solid #ff003c; }
+
+      .message { color: #ff003c; margin-top: 10px; font-weight: bold; }
+      .conn-status {
+            text-align: center; font-weight: bold; margin-bottom: 10px;
+            padding: 5px; border-radius: 5px;
+      }
+      .status-connected { background: rgba(0, 255, 0, 0.2); color: #00ff00; }
+      .status-disconnected { background: rgba(255, 0, 60, 0.2); color: #ff003c; }
+
+      /* --- DASHBOARD LAYOUT --- */
+      .dashboard { display: grid; grid-template-columns: 1fr; gap: 20px; }
+      @media (min-width: 900px) { .dashboard { grid-template-columns: 1fr 2fr; } }
+      .column { display: flex; flex-direction: column; gap: 20px; }
+      
+      /* User Valve Status display */
+      .user-valve-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center; }
+      .user-valve-item { padding: 15px; border: 1px solid rgba(0, 255, 255, 0.1); border-radius: 10px; background: rgba(0, 255, 255, 0.05); }
+
+      /* Schedule Info */
+      .schedule-info {
+            margin-top: 15px; padding-top: 10px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.2);
+            color: #f39c12; font-size: 0.95rem; line-height: 1.4;
+      }
+      
+      /* Usage Stats (NEW) */
+      .usage-stats {
+            color: #00ffff; font-size: 1.1rem; font-weight: bold; margin: 10px 0;
+            background: rgba(0, 255, 255, 0.1); padding: 5px; border-radius: 5px;
+      }
+
+      /* IoT Visuals */
+      .tank { width: 100px; height: 150px; border: 3px solid #00ffff; border-radius: 10px; margin: 20px auto; position: relative; background: rgba(0, 0, 0, 0.2); }
+      .water {
+            background: #00ffff; box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+            position: absolute; bottom: 0; left: 0; right: 0; border-radius: 0 0 7px 7px;
+            transition: height 0.5s ease;
+      }
+      .tank-label { text-align: center; font-size: 20px; font-weight: bold; color: #fff; margin-top: 5px; }
+      .temp-display { text-align: center; font-size: 48px; font-weight: bold; color: #fff; margin: 30px 0; }
+      .alert-critical, .alert-ok { padding: 10px; border-radius: 8px; margin-bottom: 8px; font-weight: bold; }
+      .alert-critical { background: rgba(255, 0, 60, 0.4); border: 1px solid #ff003c; }
+      .alert-ok { background: rgba(0, 255, 0, 0.2); border: 1px solid #00ff00; }
+
+      /* Valve Controls */
+      .valve-controls { display: grid; grid-template-columns: 1fr; gap: 20px; }
+      @media (min-width: 600px) { .valve-controls { grid-template-columns: 1fr 1fr; } }
+      .valve-section { border: 1px solid rgba(0, 255, 255, 0.2); border-radius: 12px; padding: 15px; }
+      .valve-status {
+            font-size: 18px; font-weight: bold; margin-bottom: 10px; padding: 10px;
+            border-radius: 8px; text-align: center; color: #000;
+      }
+      .status-on { background: #00ff00; box-shadow: 0 0 15px #00ff00; }
+      .status-off { background: #ff003c; box-shadow: 0 0 15px #ff003c; }
+      .manual-controls { display: flex; justify-content: space-around; margin: 15px 0; }
+      .btn-on { background: #00ff00; box-shadow: 0 0 10px rgba(0, 255, 0, 0.7); }
+      .btn-off { background: #ff003c; box-shadow: 0 0 10px rgba(255, 0, 60, 0.7); }
+      .btn-on:hover { background: #00b300; }
+      .btn-off:hover { background: #c0002d; }
+
+      /* Scheduling form */
+      .schedule-form { display: flex; flex-direction: column; gap: 10px; }
+      .schedule-form input, .schedule-form select {
+            padding: 10px; border-radius: 5px; border: 1px solid rgba(0, 255, 255, 0.3);
+            font-size: 16px; background: rgba(0, 0, 0, 0.3); color: #fff;
+      }
+      .schedule-buttons { display: flex; gap: 10px; }
+      .btn-save { background: #00ffff; color: #000; flex-grow: 1; box-shadow: 0 0 10px rgba(0, 255, 255, 0.7); }
+      .btn-clear { background: #f39c12; color: #000; box-shadow: 0 0 10px rgba(243, 156, 18, 0.7); }
+
+      /* Logout */
+      .logout { position: fixed; top: 20px; right: 20px; z-index: 100; }
+
+      /* Help Desk */
+      #query-list { list-style: none; padding: 0; }
+      #query-list li { background: rgba(255, 255, 255, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #00ffff;}
+      #query-list li strong { color: #00ffff; display: block; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-portal" class="auth-container">
+      <div class="card">
+            <h2>💧 Water Management Access</h2>
+            <div id="connection-status" class="conn-status status-disconnected">
+                Connecting to Firebase...
+            </div>
+            <div id="login-form-container">
+                <h3 style="color: #00ffff; border-bottom: none; margin-bottom: 15px;">Login</h3>
+                <form id="login-form" class="auth-form">
+                    <input type="email" id="login-id" placeholder="Email ID" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <p id="login-message" class="message"></p>
+                <p style="margin-top: 20px;">
+                    <button class="btn" style="background: transparent; color: #00ffff; border: 1px solid #00ffff;" onclick="showRegistration()">New User? Register</button>
+                </p>
+            </div>
+            <div id="register-form-container" style="display:none;">
+                <h3 style="color: #00ffff; border-bottom: none; margin-bottom: 15px;">User Registration</h3>
+                <form id="register-form" class="auth-form">
+                    <input type="email" id="register-id" placeholder="Email ID" required>
+                    <input type="password" id="register-password" placeholder="Choose a Passcode (6+ characters)" required> 
+                    <button type="submit" class="btn btn-primary">Register</button>
+                </form>
+                <p id="register-message" class="message"></p>
+                <p style="margin-top: 20px;">
+                    <button class="btn" style="background: transparent; color: #00ffff; border: 1px solid #00ffff;" onclick="showLogin()">Already Registered? Login</button>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="admin-portal" class="container" style="display: none;">
+      <button class="btn btn-off logout" onclick="logout()">Logout</button>
+      <h1>⚙ Admin Control Dashboard</h1>
+      <div class="dashboard">
+            <div class="column">
+                <div class="card">
+                    <h2>Tank Level</h2>
+                    <div class="tank"><div class="water" id="adminWaterLevel"></div></div>
+                    <div class="tank-label" id="adminTankPercent">--%</div>
+                    <div class="tank-label" id="adminTankVolume">-- L</div>
+                </div>
+                <div class="card">
+                    <h2>Water Temperature</h2>
+                    <div class="temp-display" id="adminTemperature">-- &deg;C</div>
+                </div>
+                <div class="card">
+                    <h2>System Alerts</h2>
+                    <ul id="adminAlertList"><li class="alert-ok">All systems normal.</li></ul>
+                </div>
+                <div class="card">
+                  <h2>Help Desk Inbox</h2>
+                  <ul id="query-list"></ul>
+                </div>
+            </div>
+            <div class="column">
+                <div class="card">
+                    <h2>Valve Control & Usage</h2>
+                    <div class="valve-controls">
+                        <div class="valve-section">
+                            <h3>Town 1</h3>
+                            <div class="valve-status status-off" id="adminValve1Status">OFF</div>
+                            <h4>Flow Rate: <span id="adminFlowRate1">-- L/min</span></h4>
+                            
+                            <div class="usage-stats">Total Used: <span id="adminTotal1">0.0</span> L</div>
+                            <button class="btn btn-sm" onclick="resetUsage(1)">Reset Counter</button>
+
+                            <h4 style="margin-top:15px;">Manual Control</h4>
+                            <div class="manual-controls">
+                                <button class="btn btn-on" onclick="setValve(1, true)">Turn ON</button>
+                                <button class="btn btn-off" onclick="setValve(1, false)">Turn OFF</button>
+                            </div>
+                            <h4>Schedule</h4>
+                            <div class="schedule-form">
+                                <input type="date" id="date1"> 
+                                <input type="time" id="time1">
+                                <select id="state1" onchange="toggleDuration(1)">
+                                    <option value="1">Turn ON</option>
+                                    <option value="0">Turn OFF</option>
+                                </select>
+                                <input type="number" id="duration1" class="duration-input" min="1" placeholder="Duration (minutes)">
+                                <div class="schedule-buttons">
+                                    <button class="btn btn-save" onclick="setSchedule(1)">Save</button>
+                                    <button class="btn btn-clear" onclick="clearSchedule(1)">Clear</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="valve-section">
+                            <h3>Town 2</h3>
+                            <div class="valve-status status-off" id="adminValve2Status">OFF</div>
+                            <h4>Flow Rate: <span id="adminFlowRate2">-- L/min</span></h4>
+
+                            <div class="usage-stats">Total Used: <span id="adminTotal2">0.0</span> L</div>
+                            <button class="btn btn-sm" onclick="resetUsage(2)">Reset Counter</button>
+
+                            <h4 style="margin-top:15px;">Manual Control</h4>
+                            <div class="manual-controls">
+                                <button class="btn btn-on" onclick="setValve(2, true)">Turn ON</button>
+                                <button class="btn btn-off" onclick="setValve(2, false)">Turn OFF</button>
+                            </div>
+                            <h4>Schedule</h4>
+                            <div class="schedule-form">
+                                <input type="date" id="date2"><input type="time" id="time2">
+                                <select id="state2" onchange="toggleDuration(2)">
+                                    <option value="1">Turn ON</option><option value="0">Turn OFF</option>
+                                </select>
+                                <input type="number" id="duration2" class="duration-input" min="1" placeholder="Duration (minutes)">
+                                <div class="schedule-buttons">
+                                    <button class="btn btn-save" onclick="setSchedule(2)">Save</button>
+                                    <button class="btn btn-clear" onclick="clearSchedule(2)">Clear</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+      </div>
+    </div>
+
+    <div id="user-portal" class="container" style="display: none;">
+        <button class="btn btn-off logout" onclick="logout()">Logout</button>
+        <h1 id="user-portal-heading">👤 User Monitoring Portal</h1> 
+        
+        <div class="dashboard">
+            <div class="column">
+                <div class="card">
+                    <h2 id="user-valve-heading">Overall System Valve Status</h2>
+                    <div class="user-valve-grid">
+                        <div class="user-valve-item">
+                            <h3>Town 1 Status</h3>
+                            <div class="valve-status status-off" id="userValve1Status">OFF</div>
+                            <h4>Flow Rate: <span id="userFlowRate1">-- L/min</span></h4>
+                            
+                            <div class="usage-stats">Total Used: <span id="userTotal1">0.0</span> L</div>
+
+                            <div id="userSchedule1" class="schedule-info">Loading schedule...</div>
+                        </div>
+                        
+                        <div class="user-valve-item">
+                            <h3>Town 2 Status</h3>
+                            <div class="valve-status status-off" id="userValve2Status">OFF</div>
+                            <h4>Flow Rate: <span id="userFlowRate2">-- L/min</span></h4>
+
+                            <div class="usage-stats">Total Used: <span id="userTotal2">0.0</span> L</div>
+
+                            <div id="userSchedule2" class="schedule-info">Loading schedule...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Central Tank Level</h2>
+                    <div class="tank">
+                        <div class="water" id="userWaterLevel"></div>
+                    </div>
+                    <div class="tank-label" id="userTankPercent">--%</div>
+                </div>
+                <div class="card">
+                    <h2>System Alerts</h2>
+                    <ul id="userAlertList"><li class="alert-ok">All systems normal.</li></ul>
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="card help-desk-container" style="margin: 0; max-width: none;">
+                    <h2>Help/Query Box</h2>
+                    <form id="help-desk-form" class="help-desk-form">
+                        <textarea id="user-query" rows="6" placeholder="Type your question here. The Admin will receive this instantly." required></textarea>
+                        <button type="submit" class="btn btn-primary">Submit Query to Admin</button>
+                    </form>
+                    <p id="query-message" class="message" style="color: #00ff00;"></p>
+                    <p style="margin-top: 30px;">
+                        *Previous Queries:*
+                        <ul id="user-query-history" style="text-align: left; margin-top: 10px; list-style: none;"></ul>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+      // 1. FIREBASE CONFIG
+      const firebaseConfig = {
+        apiKey: "AIzaSyDkr6eUJvUxUt27_a_1QDJp3LNOTyOAs-g",
+        authDomain: "wmsiot-7f0b6.firebaseapp.com",
+        databaseURL: "https://wmsiot-7f0b6-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "wmsiot-7f0b6",
+        storageBucket: "wmsiot-7f0b6.firebasestorage.app",
+        messagingSenderId: "902738973244",
+        appId: "1:902738973244:web:2bf889e5010ad64e5ce939",
+        measurementId: "G-FSEVEKNJLE"
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const db = firebase.database();
+      const statusEl = document.getElementById('connection-status');
+      statusEl.innerText = "Connected to Firebase ✅";
+      statusEl.className = 'conn-status status-connected';
+
+      // --- GLOBAL VARIABLES ---
+      let currentRole = null;
+      let currentUser = null;
+      let adminEmail = "admin@water.com"; 
+
+      // Live Data Holders (for calculation)
+      let liveFlow1 = 0;
+      let liveFlow2 = 0;
+      let liveTotal1 = 0;
+      let liveTotal2 = 0;
+
+      // --- AUTHENTICATION ---
+      auth.onAuthStateChanged(user => {
+        if (user) {
+          currentUser = user;
+          if (user.email === adminEmail) { 
+            currentRole = 'admin';
+            showPortal('admin-portal');
+            startConsumptionCalculator(); // Admin acts as the calculator
+          } else {
+            currentRole = 'user';
+            showPortal('user-portal');
+            loadUserQueryHistory(user.uid);
+          }
+          startDataListeners(user.uid);
+        } else {
+          currentUser = null;
+          currentRole = null;
+          showPortal('auth-portal');
+        }
+      });
+
+      // Login/Register Logic
+      document.getElementById('login-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const email = document.getElementById('login-id').value;
+        const password = document.getElementById('login-password').value;
+        auth.signInWithEmailAndPassword(email, password).catch(e => document.getElementById('login-message').innerText = `❌ ${e.message}`);
+      });
+
+      document.getElementById('register-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const email = document.getElementById('register-id').value;
+        const password = document.getElementById('register-password').value;
+        auth.createUserWithEmailAndPassword(email, password)
+          .then(cred => {
+            db.ref('users/' + cred.user.uid).set({ email: cred.user.email, role: 'user' });
+            document.getElementById('register-message').innerText = "✅ Registered! Please Login.";
+            setTimeout(showLogin, 2000);
+          })
+          .catch(e => document.getElementById('register-message').innerText = `❌ ${e.message}`);
+      });
+
+      function logout() { auth.signOut(); }
+      function showPortal(id) {
+        ['auth-portal','admin-portal','user-portal'].forEach(p => document.getElementById(p).style.display = 'none');
+        if(id) document.getElementById(id).style.display = 'block';
+      }
+      function showRegistration() {
+        document.getElementById('login-form-container').style.display = 'none';
+        document.getElementById('register-form-container').style.display = 'block';
+      }
+      function showLogin() {
+        document.getElementById('login-form-container').style.display = 'block';
+        document.getElementById('register-form-container').style.display = 'none';
+      }
+
+      // --- DATA HANDLING & UI ---
+      function startDataListeners(userId) {
+        db.ref().on('value', (snapshot) => {
+          const data = snapshot.val();
+          if (data) updateUI(data);
+        });
+      }
+      
+      function updateUI(data) {
+        const sensors = data.sensors || {};
+        const levelPercent = parseFloat(sensors.levelPercent || 0);
+        
+        // Update global vars for calculator
+        liveFlow1 = parseFloat(sensors.flow1 || 0);
+        liveFlow2 = parseFloat(sensors.flow2 || 0);
+        liveTotal1 = parseFloat(sensors.total1 || 0);
+        liveTotal2 = parseFloat(sensors.total2 || 0);
+
+        const controls = data.controls || {};
+        
+        // --- Alerts ---
+        const alertListAdmin = document.getElementById('adminAlertList');
+        const alertListUser = document.getElementById('userAlertList');
+        let alertHTML = (levelPercent < 10) ? '<li class="alert-critical">⚠ <b>LOW WATER:</b> Tank level is critical!</li>' : '<li class="alert-ok">✅ All systems normal.</li>';
+        alertListAdmin.innerHTML = alertHTML;
+        alertListUser.innerHTML = alertHTML;
+
+        // --- Admin UI ---
+        if (currentRole === 'admin') {
+            document.getElementById('adminWaterLevel').style.height = levelPercent + '%';
+            document.getElementById('adminTankPercent').innerText = levelPercent.toFixed(1) + '%';
+            document.getElementById('adminTankVolume').innerText = (sensors.volume || 0) + ' L';
+            document.getElementById('adminTemperature').innerHTML = (sensors.temperature || 0) + ' &deg;C';
+            
+            document.getElementById('adminFlowRate1').innerText = liveFlow1.toFixed(2) + ' L/min';
+            document.getElementById('adminFlowRate2').innerText = liveFlow2.toFixed(2) + ' L/min';
+            
+            // NEW: Show Total Usage
+            document.getElementById('adminTotal1').innerText = liveTotal1.toFixed(1);
+            document.getElementById('adminTotal2').innerText = liveTotal2.toFixed(1);
+
+            updateValveStatus('adminValve1Status', controls.valve1);
+            updateValveStatus('adminValve2Status', controls.valve2);
+            
+            updateScheduleUI(1, data.schedules ? data.schedules.valve1 : null);
+            updateScheduleUI(2, data.schedules ? data.schedules.valve2 : null);
+            loadAdminQueries(data);
+        }
+
+        // --- User UI ---
+        if (currentRole === 'user') {
+            document.getElementById('userWaterLevel').style.height = levelPercent + '%';
+            document.getElementById('userTankPercent').innerText = levelPercent.toFixed(1) + '%';
+            
+            document.getElementById('userFlowRate1').innerText = liveFlow1.toFixed(2) + ' L/min';
+            document.getElementById('userFlowRate2').innerText = liveFlow2.toFixed(2) + ' L/min';
+            
+            // NEW: Show Total Usage
+            document.getElementById('userTotal1').innerText = liveTotal1.toFixed(1);
+            document.getElementById('userTotal2').innerText = liveTotal2.toFixed(1);
+
+            updateValveStatus('userValve1Status', controls.valve1);
+            updateValveStatus('userValve2Status', controls.valve2);
+
+            displayUserSchedule(1, data.schedules ? data.schedules.valve1 : null);
+            displayUserSchedule(2, data.schedules ? data.schedules.valve2 : null);
+        }
+      }
+
+      function updateValveStatus(elId, state) {
+        const el = document.getElementById(elId);
+        el.innerText = state ? 'ON' : 'OFF';
+        el.className = 'valve-status ' + (state ? 'status-on' : 'status-off');
+      }
+
+      // --- CALCULATOR LOGIC (Admin Browser acts as Server) ---
+      function startConsumptionCalculator() {
+          // Run this logic every 1 second
+          setInterval(() => {
+              if (currentRole !== 'admin') return; // Only Admin calculates
+
+              let updated = false;
+              let newTotal1 = liveTotal1;
+              let newTotal2 = liveTotal2;
+
+              // If water is flowing (FlowRate > 0), add to total
+              // FlowRate is L/min. So per second, we add FlowRate / 60.
+              if (liveFlow1 > 0) {
+                  newTotal1 += (liveFlow1 / 60);
+                  updated = true;
+              }
+              if (liveFlow2 > 0) {
+                  newTotal2 += (liveFlow2 / 60);
+                  updated = true;
+              }
+
+              // Update Database if numbers changed
+              if (updated) {
+                  db.ref('sensors/total1').set(newTotal1);
+                  db.ref('sensors/total2').set(newTotal2);
+              }
+          }, 1000); // 1000ms = 1 second
+      }
+
+      function resetUsage(townNum) {
+          if (confirm(`Reset consumption counter for Town ${townNum}?`)) {
+              db.ref(`sensors/total${townNum}`).set(0);
+          }
+      }
+
+      // --- ADMIN CONTROLS ---
+      function setValve(valveNum, state) {
+        db.ref(`/controls/valve${valveNum}`).set(state);
+      }
+      
+      function toggleDuration(valveNum) {
+        const stateVal = document.getElementById('state' + valveNum).value;
+        const durInput = document.getElementById('duration' + valveNum);
+        durInput.style.display = (stateVal === '1') ? 'block' : 'none';
+        if (stateVal === '0') durInput.value = '';
+      }
+
+      function updateScheduleUI(num, schedule) {
+        if (schedule && schedule.year !== -1) {
+            const dateStr = `${schedule.year}-${String(schedule.month).padStart(2, '0')}-${String(schedule.day).padStart(2, '0')}`;
+            const timeStr = `${String(schedule.hour).padStart(2, '0')}:${String(schedule.minute).padStart(2, '0')}`;
+            document.getElementById('date' + num).value = dateStr;
+            document.getElementById('time' + num).value = timeStr;
+            document.getElementById('state' + num).value = schedule.state ? '1' : '0';
+            document.getElementById('duration' + num).value = schedule.duration > 0 ? schedule.duration : '';
+        } else {
+            document.getElementById('date' + num).value = ''; document.getElementById('time' + num).value = ''; 
+            document.getElementById('state' + num).value = '1'; document.getElementById('duration' + num).value = ''; 
+        }
+        toggleDuration(num);
+      }
+      
+      function setSchedule(valveNum) {
+        const dateVal = document.getElementById('date' + valveNum).value;
+        const timeVal = document.getElementById('time' + valveNum).value;
+        const stateVal = document.getElementById('state' + valveNum).value;
+        let durationVal = document.getElementById('duration' + valveNum).value;
+        
+        if (!timeVal || !dateVal) return alert('Select date and time.');
+        if (stateVal === '1' && !durationVal) return alert('Enter duration.');
+        if (stateVal === '0') durationVal = -1;
+        
+        const [year, month, day] = dateVal.split('-').map(Number);
+        const [hour, minute] = timeVal.split(':').map(Number);
+        
+        db.ref(`/schedules/valve${valveNum}`).set({
+            year, month, day, hour, minute, 
+            state: parseInt(stateVal) === 1, duration: parseInt(durationVal)
+        }).then(() => alert(`Schedule for Valve ${valveNum} saved!`));
+      }
+
+      function clearSchedule(valveNum) {
+        if (confirm('Clear schedule?')) {
+          db.ref(`/schedules/valve${valveNum}`).set({ year: -1, month: -1, day: -1, hour: -1, minute: -1, state: false, duration: -1 })
+            .then(() => alert(`Schedule cleared.`));
+        }
+      }
+
+      // --- HELP DESK & QUERIES ---
+      function loadAdminQueries(data) {
+        const queryListEl = document.getElementById('query-list');
+        queryListEl.innerHTML = '';
+        const allQueries = data.queries || {};
+        for (const userId in allQueries) {
+            const userEmail = (data.users && data.users[userId]) ? data.users[userId].email : 'Unknown';
+            for (const qId in allQueries[userId]) {
+                queryListEl.innerHTML += `<li><strong>${userEmail}</strong>${allQueries[userId][qId].text}</li>`;
+            }
+        }
+      }
+
+      document.getElementById('help-desk-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const txt = document.getElementById('user-query').value.trim();
+        if (!txt || !currentUser) return;
+        db.ref(`queries/${currentUser.uid}`).push({ text: txt, timestamp: firebase.database.ServerValue.TIMESTAMP })
+          .then(() => {
+              document.getElementById('query-message').innerText = "✅ Sent!";
+              document.getElementById('user-query').value = '';
+              setTimeout(() => document.getElementById('query-message').innerText = '', 3000);
+          });
+      });
+
+      function loadUserQueryHistory(userId) {
+        db.ref(`queries/${userId}`).on('value', snap => {
+            const list = document.getElementById('user-query-history');
+            list.innerHTML = '';
+            const data = snap.val();
+            if(data) Object.values(data).forEach(q => list.innerHTML += `<li>${q.text}</li>`);
+            else list.innerHTML = '<li>No queries yet.</li>';
+        });
+      }
+
+      function displayUserSchedule(valveNum, schedule) {
+          const displayEl = document.getElementById('userSchedule' + valveNum);
+          if (schedule && schedule.year !== -1) {
+              const day = String(schedule.day).padStart(2, '0');
+              const month = String(schedule.month).padStart(2, '0');
+              const hour = String(schedule.hour).padStart(2, '0');
+              const minute = String(schedule.minute).padStart(2, '0');
+              let txt = schedule.state 
+                ? `🌊 <b>Next Supply:</b><br>${day}/${month}/${schedule.year} @ ${hour}:${minute}<br>Dur: <b>${schedule.duration} mins</b>`
+                : `🛑 <b>Stop:</b><br>${day}/${month}/${schedule.year} @ ${hour}:${minute}`;
+              displayEl.innerHTML = txt;
+          } else {
+              displayEl.innerHTML = "⏳ No upcoming water schedule.";
+              displayEl.style.color = "#888";
+          }
+      }
+    </script>
+</body>
+</html>
